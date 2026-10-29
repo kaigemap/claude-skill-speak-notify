@@ -7,12 +7,22 @@ cwd=$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null)
 [ -z "$cwd" ] && cwd=$PWD
 dir=$(basename "$cwd")
 
-# ディレクトリ名 → 読み上げ名 のマッピング (タブ区切り)
+# ディレクトリのパターン → 読み上げ名 のマッピング (タブ区切り)
 map_file="$HOME/.claude/hooks/dir-voice-names.tsv"
 spoken="$dir"
 if [ -f "$map_file" ]; then
-  hit=$(awk -F'\t' -v d="$dir" '$1 == d { print $2; exit }' "$map_file")
-  [ -n "$hit" ] && spoken="$hit"
+  while IFS=$'\t' read -r pattern reading || [ -n "$pattern$reading" ]; do
+    [ -z "$pattern" ] && continue
+    case "$pattern" in
+      \#*) continue ;;
+      */*) target="$cwd" ;;
+      *)   target="$dir" ;;
+    esac
+    # shellcheck disable=SC2254
+    case "$target" in
+      $pattern) spoken="$reading"; break ;;
+    esac
+  done < "$map_file"
 fi
 
 case "$1" in
